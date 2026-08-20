@@ -34,11 +34,6 @@ jobs:
 
           sudo chown -R ubuntu:ubuntu /var/www/express-app/backend
 
-      - name: Create production environment file
-        working-directory: /var/www/express-app/backend
-        run: |
-          echo "${{ secrets.PROD_ENV_FILE }}" > .env
-
       - name: Install production dependencies
         working-directory: /var/www/express-app/backend
         run: npm ci --omit=dev
