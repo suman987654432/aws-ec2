@@ -1,21 +1,26 @@
-name: Backend CI/CD
+
+name: Node.js CI/CD
 
 on:
   push:
     branches: ["master"]
 
 jobs:
-  deploy:
+  build:
     runs-on: self-hosted
+
+    strategy:
+      matrix:
+        node-version: [22.x]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node-version }}
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -23,23 +28,13 @@ jobs:
         working-directory: ./backend
         run: npm ci
 
-      - name: Deploy backend
+      - name: Create production environment file
+        working-directory: ./backend
         run: |
-          sudo mkdir -p /var/www/express-app/backend
+          echo "${{ secrets.PROD_ENV_FILE }}" > .env
 
-          sudo rsync -av --delete \
-            --exclude ".env" \
-            --exclude "node_modules" \
-            ./backend/ /var/www/express-app/backend/
-
-          sudo chown -R ubuntu:ubuntu /var/www/express-app/backend
-
-      - name: Install production dependencies
-        working-directory: /var/www/express-app/backend
-        run: npm ci --omit=dev
-
-      - name: Restart backend
-        working-directory: /var/www/express-app/backend
+      - name: Start backend
+        working-directory: ./backend
         run: |
-          pm2 restart BackendAPI || pm2 start server.js --name BackendAPI
-          pm2 save
+          # deployment command will go here
+          echo "Backend ready"
