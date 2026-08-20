@@ -1,28 +1,21 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
-name: Node.js CI/CD
+name: Backend CI/CD
 
 on:
   push:
     branches: ["master"]
 
 jobs:
-  build:
+  deploy:
     runs-on: self-hosted
-
-    strategy:
-      matrix:
-        node-version: [22.x]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -30,13 +23,28 @@ jobs:
         working-directory: ./backend
         run: npm ci
 
+      - name: Deploy backend
+        run: |
+          sudo mkdir -p /var/www/express-app/backend
+
+          sudo rsync -av --delete \
+            --exclude ".env" \
+            --exclude "node_modules" \
+            ./backend/ /var/www/express-app/backend/
+
+          sudo chown -R ubuntu:ubuntu /var/www/express-app/backend
+
       - name: Create production environment file
-        working-directory: ./backend
+        working-directory: /var/www/express-app/backend
         run: |
           echo "${{ secrets.PROD_ENV_FILE }}" > .env
 
-      - name: Start backend
-        working-directory: ./backend
+      - name: Install production dependencies
+        working-directory: /var/www/express-app/backend
+        run: npm ci --omit=dev
+
+      - name: Restart backend
+        working-directory: /var/www/express-app/backend
         run: |
-          # deployment command will go here
-          echo "Backend ready"
+          pm2 restart BackendAPI || pm2 start server.js --name BackendAPI
+          pm2 save
